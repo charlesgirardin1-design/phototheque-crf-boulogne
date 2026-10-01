@@ -8,10 +8,15 @@ import postgres from "postgres";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
-  console.error(
-    "[migrate] DATABASE_URL n'est pas définie. Configurez-la dans Vercel (Settings → Environment Variables) ou dans .env.local.",
+  // Sur Vercel, on laisse le build aboutir : le site s'affiche et indique la configuration
+  // manquante. Les migrations s'appliqueront au prochain déploiement, une fois la base reliée.
+  const onVercel = Boolean(process.env.VERCEL);
+  const log = onVercel ? console.warn : console.error;
+  log(
+    "[migrate] DATABASE_URL n'est pas définie. Configurez-la dans Vercel (Settings → Environment Variables) ou dans .env.local." +
+      (onVercel ? " Migrations ignorées pour ce déploiement." : ""),
   );
-  process.exit(1);
+  process.exit(onVercel ? 0 : 1);
 }
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "db", "migrations");

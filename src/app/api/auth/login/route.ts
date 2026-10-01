@@ -1,5 +1,6 @@
 import { db } from "@/lib/server/db";
 import { assertSameOrigin, clientIp, handler, HttpError, readJson } from "@/lib/server/http";
+import { missingConfig } from "@/lib/server/config-status";
 import { roleForPassword, startSession } from "@/lib/server/session";
 
 const MAX_FAILURES = 10;
@@ -13,6 +14,9 @@ const WINDOW_MINUTES = 15;
  */
 export const POST = handler(async (req: Request) => {
   assertSameOrigin(req);
+  if (missingConfig().length > 0) {
+    throw new HttpError(503, "Application en cours d'installation : configuration incomplète");
+  }
   const sql = db();
   const ip = clientIp(req);
 

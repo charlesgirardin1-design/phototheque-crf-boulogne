@@ -50,6 +50,11 @@ export const env = {
     const safeMb = Number.isFinite(mb) && mb > 0 ? Math.min(mb, 5120) : 5000;
     return Math.floor(safeMb * 1024 * 1024);
   },
+  /** Espace de stockage total (défaut : 1 Go, offre Vercel Hobby). STORAGE_QUOTA_GB pour une autre offre. */
+  get storageQuotaBytes() {
+    const gb = Number(optional("STORAGE_QUOTA_GB") ?? "1");
+    return Math.round((Number.isFinite(gb) && gb > 0 ? gb : 1) * 1_000_000_000);
+  },
   get cronSecret() {
     return optional("CRON_SECRET");
   },

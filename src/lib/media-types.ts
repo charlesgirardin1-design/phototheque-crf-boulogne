@@ -50,14 +50,15 @@ export function isBrowserDisplayableImage(mime: string) {
 export const STATUS_LABELS = { A_TRIER: "À TRIER", TRIEE: "TRIÉE" } as const;
 export type MediaStatus = keyof typeof STATUS_LABELS;
 
+/** Taille lisible en unités décimales (1 Go = 1 000 000 000 octets, comme Vercel). */
 export function formatBytes(n: number) {
-  if (n < 1024) return `${n} o`;
+  if (n < 1000) return `${n} o`;
   const units = ["Ko", "Mo", "Go", "To"];
-  let v = n / 1024;
+  let v = n / 1000;
   let i = 0;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
+  while (v >= 1000 && i < units.length - 1) {
+    v /= 1000;
     i++;
   }
-  return `${v.toFixed(v < 10 ? 1 : 0)} ${units[i]}`;
+  return `${v.toFixed(v < 10 ? 1 : 0).replace(".", ",")} ${units[i]}`;
 }

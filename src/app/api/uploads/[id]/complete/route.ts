@@ -59,7 +59,9 @@ export const POST = handler(async (req: Request, ctx: RouteContext<"/api/uploads
 
   await sql`
     UPDATE media SET upload_state = 'ready', uploaded_at = now(), updated_at = now(),
-           thumbnail_key = ${thumbnailKey}, preview_key = ${previewKey}
+           thumbnail_key = ${thumbnailKey}, preview_key = ${previewKey},
+           derived_bytes = CASE WHEN ${thumbnailKey}::text IS NULL AND ${previewKey}::text IS NULL
+                                THEN 0 ELSE derived_bytes END
     WHERE id = ${id}`;
   return Response.json({ ok: true, id });
 });

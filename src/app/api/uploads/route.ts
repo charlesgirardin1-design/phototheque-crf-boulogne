@@ -3,8 +3,9 @@ import { db } from "@/lib/server/db";
 import { env } from "@/lib/server/env";
 import { assertSameOrigin, badRequest, cleanText, handler, readJson, requireRole } from "@/lib/server/http";
 import { assertValidClassification } from "@/lib/server/media";
+import { usedStorageBytes } from "@/lib/server/stats";
 import { presignUpload, storageDriver } from "@/lib/server/storage";
-import { formatFor } from "@/lib/media-types";
+import { formatBytes, formatFor } from "@/lib/media-types";
 
 const MAX_DERIVED_BYTES = 8 * 1024 * 1024;
 const TAKEN_AT_SOURCES = ["exif", "video", "file", "manual", "none"];
@@ -69,6 +70,18 @@ export const POST = handler(async (req: Request) => {
   const thumbnailSize = derivedSize(body.thumbnailSize);
   const previewSize = format.kind === "photo" ? derivedSize(body.previewSize) : null;
 
+  // Ne jamais dépasser l'espace disponible : sur l'offre Vercel Hobby, un dépassement
+  // bloque tout le stockage pendant 30 jours. Marge de sécurité : 95 % du quota.
+  const derivedBytes = (thumbnailSize ?? 0) + (previewSize ?? 0);
+  const limit = Math.floor(env.storageQuotaBytes * 0.95);
+  const used = await usedStorageBytes();
+  if (used + (size as number) + derivedBytes > limit) {
+    throw badRequest(
+      `Espace de stockage insuffisant : ${formatBytes(Math.max(0, limit - used))} disponibles, ` +
+        `fichier de ${formatBytes(size as number)}. Contactez l'administrateur.`,
+    );
+  }
+
   const id = randomUUID();
   const now = new Date();
   const month = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -79,10 +92,10 @@ export const POST = handler(async (req: Request) => {
   const previewKey = previewSize ? `previews/${month}/${id}.jpg` : null;
 
   await db()`
-    INSERT INTO media (id, original_filename, mime_type, media_type, size_bytes, storage_key,
+    INSERT INTO media (id, original_filename, mime_type, media_type, size_bytes, derived_bytes, storage_key,
                        thumbnail_key, preview_key, taken_at, taken_at_source, photographer,
                        category_id, activity_id, status, upload_state)
-    VALUES (${id}, ${filename}, ${format.mime}, ${format.kind}, ${size as number}, ${storageKey},
+    VALUES (${id}, ${filename}, ${format.mime}, ${format.kind}, ${size as number}, ${derivedBytes}, ${storageKey},
             ${thumbnailKey}, ${previewKey}, ${takenAt}, ${takenAtSource}, ${photographer},
             ${categoryId}, ${activityId}, 'A_TRIER', 'pending')`;
 

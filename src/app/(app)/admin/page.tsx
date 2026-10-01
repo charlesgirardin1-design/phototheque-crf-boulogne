@@ -6,13 +6,18 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
   const stats = await getStats();
+  // Espace réellement utilisable : 95 % du quota (même marge que le contrôle à l'import).
+  const usable = Math.floor(stats.quotaBytes * 0.95);
+  const free = Math.max(0, usable - stats.bytes);
+  const pct = Math.min(100, (stats.bytes / stats.quotaBytes) * 100);
+  const level = stats.bytes >= usable ? "full" : pct >= 80 ? "warn" : "ok";
   const cards = [
     { label: "Médias", value: stats.total, href: "/admin/medias" },
     { label: "À TRIER", value: stats.toSort, href: "/admin/medias?status=A_TRIER", accent: true },
     { label: "TRIÉE", value: stats.sorted, href: "/admin/medias?status=TRIEE" },
     { label: "Photos", value: stats.photos },
     { label: "Vidéos", value: stats.videos },
-    { label: "Espace utilisé", value: formatBytes(stats.bytes) },
+    { label: "Espace disponible", value: formatBytes(free), warn: level !== "ok" },
   ];
   return (
     <div className="space-y-6">
@@ -21,7 +26,7 @@ export default async function AdminDashboard() {
         {cards.map((c) => {
           const body = (
             <div
-              className={`rounded-xl border bg-white p-4 ${c.accent && stats.toSort > 0 ? "border-amber-300" : "border-neutral-200"}`}
+              className={`rounded-xl border bg-white p-4 ${(c.accent && stats.toSort > 0) || c.warn ? "border-amber-300" : "border-neutral-200"}`}
             >
               <p className="text-xs uppercase tracking-wide text-neutral-500">{c.label}</p>
               <p className="mt-1 text-xl font-semibold sm:text-2xl">{c.value}</p>
@@ -36,6 +41,43 @@ export default async function AdminDashboard() {
           );
         })}
       </div>
+      <section
+        className={`rounded-xl border bg-white p-4 ${level === "full" ? "border-red-300" : level === "warn" ? "border-amber-300" : "border-neutral-200"}`}
+      >
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className="font-semibold">Espace de stockage</h2>
+          <p className="text-sm text-neutral-600">
+            <strong className="text-neutral-900">{formatBytes(free)}</strong> disponibles sur {formatBytes(stats.quotaBytes)}
+          </p>
+        </div>
+        <div
+          className="h-3 overflow-hidden rounded-full bg-neutral-100"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(pct)}
+          aria-label="Espace utilisé"
+        >
+          <div
+            className={`h-full rounded-full ${level === "full" ? "bg-red-600" : level === "warn" ? "bg-amber-500" : "bg-green-600"}`}
+            style={{ width: `${Math.max(pct, stats.bytes > 0 ? 1 : 0)}%` }}
+          />
+        </div>
+        <p className="mt-2 text-xs text-neutral-500">
+          {formatBytes(stats.bytes)} utilisés ({pct.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %), originaux et
+          miniatures compris. 5 % sont gardés en réserve : un dépassement bloquerait le stockage Vercel pendant 30 jours.
+        </p>
+        {level === "warn" && (
+          <p className="mt-2 text-sm text-amber-800">
+            Le stockage sera bientôt plein. Supprimez des médias inutiles ou passez à une offre Vercel supérieure.
+          </p>
+        )}
+        {level === "full" && (
+          <p className="mt-2 text-sm text-red-800">
+            Stockage plein : les nouveaux imports sont bloqués pour éviter la suspension du stockage par Vercel.
+          </p>
+        )}
+      </section>
       <section className="rounded-xl border border-neutral-200 bg-white p-4">
         <h2 className="mb-3 font-semibold">Répartition par catégorie</h2>
         {stats.byCategory.length === 0 ? (

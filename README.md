@@ -40,6 +40,9 @@ avec deux profils d'accès (Utilisateur / Administrateur).
   (sans compression). Sur Chrome/Edge, l'archive est écrite directement sur le disque (pas de limite de
   taille) ; sur les autres navigateurs elle est construite en mémoire (préférer des lots de quelques Go).
   Aucune limite Vercel (durée, mémoire, taille de réponse) n'est sollicitée.
+- **Espace de stockage** : le tableau de bord affiche l'espace disponible (jauge, alerte à 80 %).
+  Un import est refusé s'il ferait dépasser 95 % du quota : sur l'offre Vercel Hobby (1 Go), un
+  dépassement bloquerait le stockage pendant 30 jours.
 - **Suppression** : les fichiers (original, miniature, aperçu) sont supprimés du stockage, puis
   l'enregistrement en base. Un import abandonné est nettoyé automatiquement chaque nuit (Vercel Cron).
 
@@ -89,6 +92,7 @@ npm run storage:cors         # autorise le navigateur à envoyer/lire les fichie
 | `S3_REGION` | non | `auto` pour R2 (défaut), ex. `eu-west-3` pour AWS |
 | `S3_FORCE_PATH_STYLE` | non | `true` uniquement pour MinIO et assimilés |
 | `CRON_SECRET` | recommandé | Protège la tâche de nettoyage nocturne (`/api/cron/cleanup`) |
+| `STORAGE_QUOTA_GB` | non | Espace de stockage total affiché et contrôlé (défaut 1 Go, offre Vercel Hobby) |
 | `MAX_UPLOAD_SIZE_MB` | non | Taille max. d'un fichier (défaut 5000, max. 5120) |
 | `APP_ORIGINS` | script CORS | Origines autorisées, utilisée seulement par `npm run storage:cors` |
 

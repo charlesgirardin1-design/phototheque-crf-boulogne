@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "./db";
+import { env } from "./env";
 
 export async function getStats() {
   const sql = db();
@@ -11,7 +12,7 @@ export async function getStats() {
            count(*) FILTER (WHERE status = 'TRIEE') AS sorted,
            count(*) FILTER (WHERE media_type = 'photo') AS photos,
            count(*) FILTER (WHERE media_type = 'video') AS videos,
-           sum(size_bytes) AS bytes
+           sum(size_bytes + derived_bytes) AS bytes
     FROM media WHERE upload_state = 'ready'`;
   const byCategory = await sql<{ name: string; n: string }[]>`
     SELECT COALESCE(c.name, 'Sans catégorie') AS name, count(*) AS n
@@ -25,6 +26,14 @@ export async function getStats() {
     photos: Number(totals.photos),
     videos: Number(totals.videos),
     bytes: Number(totals.bytes ?? 0),
+    quotaBytes: env.storageQuotaBytes,
     byCategory: byCategory.map((r) => ({ name: r.name, count: Number(r.n) })),
   };
+}
+
+/** Espace occupé, imports en cours compris (réservations). */
+export async function usedStorageBytes(): Promise<number> {
+  const [{ bytes }] = await db()<{ bytes: string | null }[]>`
+    SELECT sum(size_bytes + derived_bytes) AS bytes FROM media`;
+  return Number(bytes ?? 0);
 }

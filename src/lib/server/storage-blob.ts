@@ -84,3 +84,10 @@ export async function deleteObjects(keys: string[]) {
     await del(unique.slice(i, i + 500));
   }
 }
+
+/** Ouvre un objet en lecture (flux + métadonnées), ou null s'il n'existe pas. */
+export async function openRead(key: string) {
+  const res = await get(key, { access: "private", useCache: false });
+  if (!res || res.statusCode !== 200) return null;
+  return { stream: res.stream, size: res.blob.size, contentType: res.blob.contentType };
+}

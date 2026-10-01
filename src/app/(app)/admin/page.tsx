@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getStats } from "@/lib/server/stats";
 import { formatBytes } from "@/lib/media-types";
+import { ReleaseSpaceButton } from "@/components/ReleaseSpaceButton";
 
 export const dynamic = "force-dynamic";
 
@@ -65,18 +66,19 @@ export default async function AdminDashboard() {
         </div>
         <p className="mt-2 text-xs text-neutral-500">
           {formatBytes(stats.bytes)} utilisés ({pct.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %), originaux et
-          miniatures compris. 5 % sont gardés en réserve : un dépassement bloquerait le stockage Vercel pendant 30 jours.
+          miniatures compris. 5 % sont gardés en réserve par sécurité.
         </p>
         {level === "warn" && (
           <p className="mt-2 text-sm text-amber-800">
-            Le stockage sera bientôt plein. Supprimez des médias inutiles ou passez à une offre Vercel supérieure.
+            Le stockage sera bientôt plein. Récupérez les médias triés ci-dessous pour libérer de la place.
           </p>
         )}
         {level === "full" && (
           <p className="mt-2 text-sm text-red-800">
-            Stockage plein : les nouveaux imports sont bloqués pour éviter la suspension du stockage par Vercel.
+            Stockage plein : les nouveaux imports sont bloqués. Récupérez les médias triés ci-dessous pour libérer de la place.
           </p>
         )}
+        <ReleaseSpaceButton />
       </section>
       <section className="rounded-xl border border-neutral-200 bg-white p-4">
         <h2 className="mb-3 font-semibold">Répartition par catégorie</h2>

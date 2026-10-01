@@ -7,6 +7,8 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { Readable } from "node:stream";
+import type { ReadableStream as NodeWebStream } from "node:stream/web";
 import { env } from "./env";
 
 /**
@@ -110,4 +112,22 @@ export async function deleteObjects(keys: string[]) {
       throw new Error(`Suppression impossible de ${errors.length} fichier(s) dans le stockage`);
     }
   }
+}
+
+/** Écrit un objet depuis un flux (migration d'un autre stockage). La taille doit être connue. */
+export async function putObjectStream(
+  key: string,
+  body: ReadableStream<Uint8Array>,
+  contentType: string,
+  size: number,
+) {
+  await client().send(
+    new PutObjectCommand({
+      Bucket: bucket(),
+      Key: key,
+      Body: Readable.fromWeb(body as unknown as NodeWebStream<Uint8Array>),
+      ContentType: contentType,
+      ContentLength: size,
+    }),
+  );
 }

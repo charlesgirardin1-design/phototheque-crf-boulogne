@@ -40,6 +40,8 @@ avec deux profils d'accès (Utilisateur / Administrateur).
   (sans compression). Sur Chrome/Edge, l'archive est écrite directement sur le disque (pas de limite de
   taille) ; sur les autres navigateurs elle est construite en mémoire (préférer des lots de quelques Go).
   Aucune limite Vercel (durée, mémoire, taille de réponse) n'est sollicitée.
+- **Libérer l'espace** : sur le tableau de bord, « Récupérer les triées et libérer l'espace » télécharge
+  un ZIP des médias « TRIÉE » (originaux intacts) puis, après confirmation, les supprime du site.
 - **Espace de stockage** : le tableau de bord affiche l'espace disponible (jauge, alerte à 80 %).
   Un import est refusé s'il ferait dépasser 95 % du quota : sur l'offre Vercel Hobby (1 Go), un
   dépassement bloquerait le stockage pendant 30 jours.
@@ -138,7 +140,15 @@ de données (`scripts/migrate.mjs`, idempotent) puis lance `next build`.
   (Production + Preview). `BLOB_STORE_ID` est ajouté automatiquement et l'authentification
   se fait par OIDC : aucune clé à gérer, aucun réglage CORS.
 
-**Alternative — Cloudflare R2 (si aucun Blob n'est relié)**
+**Backblaze B2 (10 Go gratuits, sans carte bancaire) — prioritaire dès que configuré**
+Renseigner `S3_ENDPOINT` (ex. `https://s3.eu-central-003.backblazeb2.com`), `S3_REGION`
+(ex. `eu-central-003`), `S3_BUCKET`, `S3_ACCESS_KEY_ID` (keyID), `S3_SECRET_ACCESS_KEY`
+(applicationKey) et `STORAGE_QUOTA_GB=10`. Les fichiers déjà sur Vercel Blob se transfèrent avec
+`POST /api/admin/storage/migrate` (administrateur), rejouable jusqu'à `remaining: 0`.
+CORS du bucket : Bucket Settings → CORS Rules → origine `https://<votre-site>.vercel.app`,
+« S3 Compatible API ».
+
+**Alternative — Cloudflare R2**
 1. Cloudflare → *R2* → *Create bucket* (ex. `phototheque-crf`). Laisser l'accès public **désactivé**.
 2. *R2* → *Manage API tokens* → *Create API token* : permission **Object Read & Write**, limitée à ce
    bucket. Noter l'Access Key ID, le Secret et l'endpoint `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`.

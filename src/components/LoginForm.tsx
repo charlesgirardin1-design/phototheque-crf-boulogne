@@ -17,7 +17,7 @@ export function LoginForm() {
         method: "POST",
         json: { password },
       });
-      window.location.href = role === "admin" ? "/admin" : "/galerie";
+      window.location.href = role === "admin" ? "/admin" : "/importer";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connexion impossible");
       setPassword("");

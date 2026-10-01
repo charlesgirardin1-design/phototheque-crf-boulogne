@@ -13,6 +13,8 @@ avec deux profils d'accès (Utilisateur / Administrateur).
 
 ## Fonctionnement
 
+- **Profils** : l'**Utilisateur** n'a accès qu'à la page « Importer » ; la consultation, le tri, le
+  téléchargement et la suppression sont réservés à l'**Administrateur** (contrôlé côté serveur).
 - **Import** (Utilisateur et Administrateur) : sélection multiple ou glisser-déposer, barre de progression,
   annulation. Le navigateur envoie le fichier **original directement au stockage** grâce à une URL
   signée : les gros fichiers ne passent jamais par une fonction Vercel (limitée à 4,5 Mo par requête).
@@ -23,9 +25,11 @@ avec deux profils d'accès (Utilisateur / Administrateur).
   (et un aperçu pour HEIC/TIFF) sont générées dans le navigateur, pour l'affichage.
 - **Métadonnées** : nom, type, taille, date d'import, date de prise de vue (EXIF pour les photos, y compris
   HEIC ; métadonnées MP4/MOV pour les vidéos ; à défaut, date du fichier, signalée comme telle),
-  photographe, catégorie, activité, statut, identifiant unique.
+  photographe, catégorie, activité, statut, identifiant unique. Le formulaire d'import propose un
+  calendrier « Date de la prise de vue » : si une date est choisie, elle s'applique à tous les
+  fichiers de l'import (sinon la date est lue automatiquement dans chaque fichier).
 - **Statut** : tout nouvel import est « À TRIER ». L'administrateur le passe à « TRIÉE » (ou l'inverse),
-  individuellement ou en lot. **Les utilisateurs ne voient que les médias « TRIÉE ».**
+  individuellement ou en lot.
 - **Catégories et activités** en base de données, gérées par l'administrateur (ajout, renommage,
   désactivation, suppression si inutilisées). Données initiales : US, AS, Activité de transfert,
   Autre (avec l'activité Formation).
@@ -47,7 +51,7 @@ avec deux profils d'accès (Utilisateur / Administrateur).
   valable 12 h. Changer `AUTH_SECRET` déconnecte tout le monde.
 - **Chaque route API vérifie le rôle** ; le proxy (`src/proxy.ts`) et les layouts serveur protègent
   en plus les pages. Un utilisateur ne peut ni voir l'espace admin, ni appeler les API admin, ni
-  télécharger un média « À TRIER ».
+  consulter ou télécharger des médias.
 - Bucket **privé** : les fichiers ne sont accessibles que par des URL signées temporaires (1 h pour
   l'affichage, 5 min pour un téléchargement), générées après contrôle du rôle.
 - Limitation : 10 mots de passe erronés par IP et par 15 minutes.
@@ -77,6 +81,7 @@ npm run storage:cors         # autorise le navigateur à envoyer/lire les fichie
 | `AUTH_SECRET` | oui | Secret de signature des sessions, ≥ 32 caractères (`openssl rand -base64 48`) |
 | `USER_PASSWORD` | oui | Mot de passe du profil Utilisateur |
 | `ADMIN_PASSWORD` | oui | Mot de passe du profil Administrateur |
+| `ADMIN_PASSWORD_2`, `_3`… / `USER_PASSWORD_2`, `_3`… | non | Mots de passe supplémentaires pour chaque profil |
 | `S3_BUCKET` | oui | Nom du bucket (privé) |
 | `S3_ACCESS_KEY_ID` | oui | Clé d'accès au bucket (lecture/écriture sur ce bucket uniquement) |
 | `S3_SECRET_ACCESS_KEY` | oui | Secret de la clé d'accès |

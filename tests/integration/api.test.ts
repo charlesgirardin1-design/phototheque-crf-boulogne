@@ -127,7 +127,7 @@ test("un utilisateur ne peut rien faire d'administrateur", async () => {
   assert.equal((await call(user, "/api/admin/categories", { method: "POST", json: { name: "Pirate" } })).status, 403);
   const page = await call(user, "/admin");
   assert.equal(page.status, 307);
-  assert.equal(new URL(page.headers.get("location")!, BASE).pathname, "/galerie");
+  assert.equal(new URL(page.headers.get("location")!, BASE).pathname, "/importer");
   // Cookie falsifié
   const forged: Client = { cookie: "crf_session=eyJhbGciOiJub25lIn0.eyJyb2xlIjoiYWRtaW4ifQ." };
   assert.equal((await call(forged, "/api/admin/stats")).status, 401);
@@ -150,7 +150,7 @@ test("import, statut, visibilité, téléchargement de l'original intact, suppre
   const v = await upload(user, "clip.mov", mp4, { photographer: "Jean Martin" });
   assert.equal(v.completeStatus, 200);
 
-  // Nouveau média : « À TRIER », invisible pour l'utilisateur, visible pour l'admin.
+  // Nouveau média : « À TRIER », visible pour l'admin.
   const adminList = await body(await call(admin, "/api/media?status=A_TRIER&q=Marie"));
   const item = (adminList.items as Record<string, unknown>[]).find((i) => i.id === p.id)!;
   assert.equal(item.status, "A_TRIER");
@@ -160,11 +160,14 @@ test("import, statut, visibilité, téléchargement de l'original intact, suppre
   assert.equal(item.categoryName, "Autre");
   assert.equal(item.activityName, "Formation");
   assert.equal(item.takenAt, "2024-06-15T10:00:00.000Z");
-  const userList = await body(await call(user, "/api/media?status=A_TRIER"));
-  assert.ok(!(userList.items as { id: string }[]).some((i) => i.id === p.id), "À TRIER caché à l'utilisateur");
-  assert.equal((await call(user, `/api/media/${p.id}/download`)).status, 404);
-  const urls = await body(await call(user, "/api/media/download-urls", { method: "POST", json: { ids: [p.id] } }));
-  assert.equal((urls.files as unknown[]).length, 0);
+
+  // L'utilisateur ne fait qu'importer : aucune consultation ni téléchargement.
+  assert.equal((await call(user, "/api/media")).status, 403);
+  assert.equal((await call(user, `/api/media/${p.id}/download`)).status, 403);
+  assert.equal(
+    (await call(user, "/api/media/download-urls", { method: "POST", json: { ids: [p.id] } })).status,
+    403,
+  );
 
   // Filtres
   const videos = await body(await call(admin, "/api/media?type=video&q=Jean"));
@@ -176,7 +179,7 @@ test("import, statut, visibilité, téléchargement de l'original intact, suppre
   assert.deepEqual(await body(r), { updated: 2 });
 
   // Téléchargement : original octet pour octet, sous son nom d'origine.
-  const dl = await call(user, `/api/media/${p.id}/download`);
+  const dl = await call(admin, `/api/media/${p.id}/download`);
   assert.equal(dl.status, 302);
   const file = await fetch(dl.headers.get("location")!);
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -185,7 +188,7 @@ test("import, statut, visibilité, téléchargement de l'original intact, suppre
   assert.match(file.headers.get("content-disposition") ?? "", /IMG%202024%20%C3%A9t%C3%A9\.JPG/);
 
   // Téléchargement multiple : URL des originaux
-  const multi = await body(await call(user, "/api/media/download-urls", { method: "POST", json: { ids: [p.id, v.id] } }));
+  const multi = await body(await call(admin, "/api/media/download-urls", { method: "POST", json: { ids: [p.id, v.id] } }));
   const files = multi.files as { url: string; filename: string }[];
   assert.equal(files.length, 2);
   const vid = files.find((f) => f.filename === "clip.mov")!;

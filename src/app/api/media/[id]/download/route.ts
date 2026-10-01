@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
  * et ne transite pas par la fonction Vercel.
  */
 export const GET = handler(async (_req: Request, ctx: RouteContext<"/api/media/[id]/download">) => {
-  const role = await requireRole("user");
+  const role = await requireRole("admin");
   const { id } = await ctx.params;
   if (!isUuid(id)) throw notFound();
   const [row] = await getAccessibleMedia(role, [id]);

@@ -9,7 +9,7 @@ import { presignGet } from "@/lib/server/storage";
  */
 export const POST = handler(async (req: Request) => {
   assertSameOrigin(req);
-  const role = await requireRole("user");
+  const role = await requireRole("admin");
   const { ids } = await readJson<{ ids?: unknown }>(req);
   const rows = await getAccessibleMedia(role, uuidList(ids, 500));
   const files = await Promise.all(

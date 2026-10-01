@@ -56,6 +56,8 @@ export function Uploader() {
   const { categories } = useTaxonomy();
   const [photographer, setPhotographer] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  // Date saisie (AAAA-MM-JJ) : si renseignée, elle s'applique à tous les fichiers de l'import.
+  const [manualDate, setManualDate] = useState("");
   const [activityId, setActivityId] = useState("");
   const [items, setItems] = useState<QueueItem[]>([]);
   const [rejected, setRejected] = useState<string[]>([]);
@@ -114,7 +116,9 @@ export function Uploader() {
     let uploadId: string | null = null;
     try {
       update(item.key, { state: "analyzing", error: undefined, progress: 0 });
-      const taken = await extractTakenAt(item.file, item.kind, item.ext);
+      const taken = manualDate
+        ? { date: new Date(`${manualDate}T12:00:00`), source: "manual" as const }
+        : await extractTakenAt(item.file, item.kind, item.ext);
       const derived = await makeDerivatives(item.file, item.kind, item.ext);
       update(item.key, { takenAt: taken.date, takenAtSource: taken.source });
       if (ctrl.signal.aborted) throw new DOMException("Envoi annulé", "AbortError");
@@ -225,7 +229,7 @@ export function Uploader() {
         </p>
       </div>
 
-      <section className="grid gap-4 rounded-xl border border-neutral-200 bg-white p-4 sm:grid-cols-3">
+      <section className="grid gap-4 rounded-xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label className="label" htmlFor="photographer">
             Photographe *
@@ -282,6 +286,25 @@ export function Uploader() {
               </option>
             ))}
           </select>
+        </div>
+        <div>
+          <label className="label" htmlFor="taken-date">
+            Date de la prise de vue
+          </label>
+          <input
+            id="taken-date"
+            type="date"
+            className="input"
+            value={manualDate}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setManualDate(e.target.value)}
+            disabled={running}
+          />
+          <p className="mt-1 text-xs text-neutral-500">
+            {manualDate
+              ? "Appliquée à tous les fichiers de cet import."
+              : "Vide : date lue automatiquement dans chaque fichier."}
+          </p>
         </div>
       </section>
 
@@ -366,7 +389,13 @@ export function Uploader() {
                   <p className="text-xs text-neutral-500">
                     {formatBytes(it.file.size)}
                     {it.takenAt !== undefined &&
-                      ` — prise de vue : ${it.takenAt ? it.takenAt.toLocaleString("fr-FR") : "inconnue"}${it.takenAtSource === "file" ? " (date du fichier)" : ""}`}
+                      ` — prise de vue : ${
+                        !it.takenAt
+                          ? "inconnue"
+                          : it.takenAtSource === "manual"
+                            ? `${it.takenAt.toLocaleDateString("fr-FR")} (saisie)`
+                            : it.takenAt.toLocaleString("fr-FR")
+                      }${it.takenAtSource === "file" ? " (date du fichier)" : ""}`}
                   </p>
                   {(it.state === "uploading" || it.state === "verifying") && (
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded bg-neutral-100">

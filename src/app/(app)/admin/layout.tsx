@@ -5,6 +5,6 @@ export const dynamic = "force-dynamic";
 
 /** Contrôle serveur : l'espace administrateur n'est jamais rendu pour un autre rôle. */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  if ((await currentRole()) !== "admin") redirect("/galerie");
+  if ((await currentRole()) !== "admin") redirect("/importer");
   return <>{children}</>;
 }

@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { api } from "@/lib/client/api";
 
 const USER_LINKS = [
-  { href: "/galerie", label: "Photothèque" },
   { href: "/importer", label: "Importer" },
 ];
 const ADMIN_LINKS = [
@@ -27,7 +26,7 @@ export function AppHeader({ role }: { role: "user" | "admin" }) {
   return (
     <header className="border-b border-neutral-200 bg-white">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-        <Link href={role === "admin" ? "/admin" : "/galerie"} className="flex items-center gap-2 font-semibold">
+        <Link href={role === "admin" ? "/admin" : "/importer"} className="flex items-center gap-2 font-semibold">
           <span aria-hidden className="relative block h-5 w-5">
             <span className="absolute left-1/2 top-0 h-full w-1.5 -translate-x-1/2 bg-crf" />
             <span className="absolute left-0 top-1/2 h-1.5 w-full -translate-y-1/2 bg-crf" />

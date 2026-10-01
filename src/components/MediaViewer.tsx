@@ -51,6 +51,7 @@ export function MediaViewer({
   }, [item]);
 
   const [shownId, setShownId] = useState<string | null>(null);
+  const touchX = useRef<number | null>(null);
   if (item && item.id !== shownId) {
     setShownId(item.id);
     setEditing(false);
@@ -75,11 +76,29 @@ export function MediaViewer({
     <dialog
       ref={ref}
       onClose={onClose}
-      className="m-auto h-[95vh] w-[95vw] max-w-6xl rounded-xl p-0 shadow-2xl backdrop:bg-black/70"
+      className="m-0 h-dvh max-h-none w-screen max-w-none p-0 backdrop:bg-black/70 sm:m-auto sm:h-[95vh] sm:max-h-[95vh] sm:w-[95vw] sm:max-w-6xl sm:rounded-xl sm:shadow-2xl"
     >
       {item && (
-        <div className="flex h-full flex-col lg:flex-row">
-          <div className="relative flex min-h-0 flex-1 items-center justify-center bg-neutral-900">
+        <div className="flex h-full flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+          <div
+            className="relative flex h-[55dvh] shrink-0 items-center justify-center bg-neutral-900 pt-[env(safe-area-inset-top)] lg:h-auto lg:min-h-0 lg:flex-1 lg:shrink"
+            onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
+            onTouchEnd={(e) => {
+              const start = touchX.current;
+              touchX.current = null;
+              if (start === null || editing) return;
+              const dx = e.changedTouches[0].clientX - start;
+              if (dx > 60) onPrev?.();
+              if (dx < -60) onNext?.();
+            }}
+          >
+            <button
+              onClick={onClose}
+              aria-label="Fermer l'aperçu"
+              className="absolute right-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-lg text-white lg:hidden"
+            >
+              ✕
+            </button>
             {mediaError ? (
               <p className="p-6 text-center text-sm text-neutral-300">
                 Aperçu indisponible dans ce navigateur pour ce format. Téléchargez l&apos;original pour le consulter.
@@ -122,10 +141,10 @@ export function MediaViewer({
               </button>
             )}
           </div>
-          <aside className="w-full shrink-0 overflow-y-auto border-t border-neutral-200 p-5 text-sm lg:w-80 lg:border-l lg:border-t-0">
+          <aside className="w-full shrink-0 border-t border-neutral-200 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-sm sm:p-5 lg:w-80 lg:overflow-y-auto lg:border-l lg:border-t-0">
             <div className="flex items-start justify-between gap-2">
               <h2 className="break-all font-semibold">{item.filename}</h2>
-              <button onClick={onClose} className="text-neutral-500 hover:text-neutral-900" aria-label="Fermer">
+              <button onClick={onClose} className="hidden text-neutral-500 hover:text-neutral-900 lg:block" aria-label="Fermer">
                 ✕
               </button>
             </div>

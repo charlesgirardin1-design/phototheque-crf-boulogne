@@ -59,14 +59,14 @@ export function TaxonomyManager() {
         }}
       >
         <input
-          className="input max-w-sm"
+          className="input sm:max-w-sm"
           placeholder="Nouvelle catégorie"
           value={newCategory}
           maxLength={80}
           onChange={(e) => setNewCategory(e.target.value)}
         />
-        <button className="btn-primary" disabled={busy || !newCategory.trim()}>
-          Ajouter la catégorie
+        <button className="btn-primary shrink-0" disabled={busy || !newCategory.trim()}>
+          Ajouter<span className="hidden sm:inline"> la catégorie</span>
         </button>
       </form>
 
@@ -86,20 +86,20 @@ export function TaxonomyManager() {
                   onSave={() => patch(renaming, { name: renaming.value }).then(() => setRenaming(null))}
                 />
               ) : (
-                <h2 className="flex-1 font-semibold">
+                <h2 className="min-w-0 flex-1 basis-full font-semibold sm:basis-auto">
                   {c.name}
                   <span className="ml-2 text-xs font-normal text-neutral-500">{c.mediaCount} média(s)</span>
                   {!c.isActive && <span className="ml-2 text-xs font-normal text-amber-700">désactivée</span>}
                 </h2>
               )}
-              <div className="flex gap-1 text-xs">
-                <button className="rounded px-2 py-1 hover:bg-neutral-100" onClick={() => setRenaming({ kind: "categories", id: c.id, name: c.name, value: c.name })}>
+              <div className="-ml-2 flex gap-1 text-sm sm:ml-0 sm:text-xs">
+                <button className="rounded px-2 py-2 hover:bg-neutral-100 sm:py-1" onClick={() => setRenaming({ kind: "categories", id: c.id, name: c.name, value: c.name })}>
                   Renommer
                 </button>
-                <button className="rounded px-2 py-1 hover:bg-neutral-100" onClick={() => patch({ kind: "categories", id: c.id }, { isActive: !c.isActive })}>
+                <button className="rounded px-2 py-2 hover:bg-neutral-100 sm:py-1" onClick={() => patch({ kind: "categories", id: c.id }, { isActive: !c.isActive })}>
                   {c.isActive ? "Désactiver" : "Réactiver"}
                 </button>
-                <button className="rounded px-2 py-1 text-red-700 hover:bg-red-50" onClick={() => setToDelete({ kind: "categories", id: c.id, name: c.name })}>
+                <button className="rounded px-2 py-2 text-red-700 hover:bg-red-50 sm:py-1" onClick={() => setToDelete({ kind: "categories", id: c.id, name: c.name })}>
                   Supprimer
                 </button>
               </div>
@@ -108,7 +108,7 @@ export function TaxonomyManager() {
             <ul className="mt-3 space-y-1">
               {c.activities.length === 0 && <li className="text-sm text-neutral-400">Aucune activité</li>}
               {c.activities.map((a) => (
-                <li key={a.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-neutral-50">
+                <li key={a.id} className="flex flex-wrap items-center gap-x-1 gap-y-0 rounded px-2 py-1 text-sm hover:bg-neutral-50 sm:gap-2">
                   {renaming?.id === a.id ? (
                     <RenameForm
                       value={renaming.value}
@@ -117,17 +117,17 @@ export function TaxonomyManager() {
                       onSave={() => patch(renaming, { name: renaming.value }).then(() => setRenaming(null))}
                     />
                   ) : (
-                    <span className={`flex-1 ${a.isActive ? "" : "text-neutral-400 line-through"}`}>
+                    <span className={`min-w-0 flex-1 basis-full sm:basis-auto ${a.isActive ? "" : "text-neutral-400 line-through"}`}>
                       {a.name} <span className="text-xs text-neutral-400">({a.mediaCount})</span>
                     </span>
                   )}
-                  <button className="text-xs text-neutral-600 hover:underline" onClick={() => setRenaming({ kind: "activities", id: a.id, name: a.name, value: a.name })}>
+                  <button className="px-1 py-2 text-xs text-neutral-600 hover:underline sm:py-0" onClick={() => setRenaming({ kind: "activities", id: a.id, name: a.name, value: a.name })}>
                     Renommer
                   </button>
-                  <button className="text-xs text-neutral-600 hover:underline" onClick={() => patch({ kind: "activities", id: a.id }, { isActive: !a.isActive })}>
+                  <button className="px-1 py-2 text-xs text-neutral-600 hover:underline sm:py-0" onClick={() => patch({ kind: "activities", id: a.id }, { isActive: !a.isActive })}>
                     {a.isActive ? "Désactiver" : "Réactiver"}
                   </button>
-                  <button className="text-xs text-red-700 hover:underline" onClick={() => setToDelete({ kind: "activities", id: a.id, name: a.name })}>
+                  <button className="px-1 py-2 text-xs text-red-700 hover:underline sm:py-0" onClick={() => setToDelete({ kind: "activities", id: a.id, name: a.name })}>
                     Supprimer
                   </button>
                 </li>

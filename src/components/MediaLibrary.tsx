@@ -46,6 +46,7 @@ export function MediaLibrary({ role, initialStatus }: { role: "user" | "admin"; 
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showFilters, setShowFilters] = useState(false);
   const [viewIndex, setViewIndex] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -168,8 +169,44 @@ export function MediaLibrary({ role, initialStatus }: { role: "user" | "admin"; 
 
   const viewed = viewIndex !== null ? (items[viewIndex] ?? null) : null;
 
+  const selectionActions = (
+    <>
+      <button className="btn-secondary shrink-0" onClick={() => setSelected(new Set())} aria-label="Désélectionner">
+        <span className="sm:hidden">✕</span>
+        <span className="hidden sm:inline">Désélectionner</span>
+      </button>
+      <button className="btn-primary shrink-0" onClick={downloadSelection} disabled={busy}>
+        {selected.size > 1 ? (
+          <>
+            <span className="sm:hidden">ZIP ({selected.size})</span>
+            <span className="hidden sm:inline">Télécharger (ZIP, {selected.size})</span>
+          </>
+        ) : (
+          "Télécharger"
+        )}
+      </button>
+      {isAdmin && (
+        <>
+          <button className="btn-secondary shrink-0" onClick={() => setStatus(selectedIds, "TRIEE")} disabled={busy}>
+            <span className="hidden sm:inline">Marquer </span>TRIÉE
+          </button>
+          <button className="btn-secondary shrink-0" onClick={() => setStatus(selectedIds, "A_TRIER")} disabled={busy}>
+            <span className="hidden sm:inline">Remettre </span>À TRIER
+          </button>
+          <button className="btn-danger shrink-0" onClick={() => setConfirmDelete(selectedIds)} disabled={busy}>
+            Supprimer ({selected.size})
+          </button>
+        </>
+      )}
+    </>
+  );
+
+  const activeFilters = [filters.category, filters.activity, filters.type, filters.status, filters.from, filters.to].filter(
+    Boolean,
+  ).length;
+
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${selected.size > 0 ? "pb-24 sm:pb-0" : ""}`}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">{isAdmin ? "Gestion des médias" : "Photothèque"}</h1>
@@ -181,111 +218,107 @@ export function MediaLibrary({ role, initialStatus }: { role: "user" | "admin"; 
       </div>
 
       <section className="grid gap-3 rounded-xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <input
-          className="input sm:col-span-2"
-          placeholder="Rechercher (nom de fichier, photographe, catégorie, activité)…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          aria-label="Rechercher"
-        />
-        <select className="input" value={filters.category} onChange={(e) => setFilter("category", e.target.value)} aria-label="Catégorie">
-          <option value="">Toutes les catégories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input"
-          value={filters.activity}
-          onChange={(e) => setFilter("activity", e.target.value)}
-          disabled={!category || category.activities.length === 0}
-          aria-label="Activité"
-        >
-          <option value="">Toutes les activités</option>
-          {category?.activities.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-        <select className="input" value={filters.type} onChange={(e) => setFilter("type", e.target.value as Filters["type"])} aria-label="Type">
-          <option value="">Photos et vidéos</option>
-          <option value="photo">Photos</option>
-          <option value="video">Vidéos</option>
-        </select>
-        {isAdmin && (
+        <div className="flex gap-2 sm:col-span-2">
+          <input
+            type="search"
+            className="input"
+            placeholder="Rechercher (nom, photographe, catégorie…)"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Rechercher"
+          />
+          <button
+            className="btn-secondary shrink-0 sm:hidden"
+            onClick={() => setShowFilters((v) => !v)}
+            aria-expanded={showFilters}
+          >
+            Filtres{activeFilters > 0 ? ` (${activeFilters})` : ""}
+          </button>
+        </div>
+        <div className={`${showFilters ? "grid" : "hidden"} gap-3 sm:contents`}>
+          <select className="input" value={filters.category} onChange={(e) => setFilter("category", e.target.value)} aria-label="Catégorie">
+            <option value="">Toutes les catégories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
           <select
             className="input"
-            value={filters.status}
-            onChange={(e) => setFilter("status", e.target.value as Filters["status"])}
-            aria-label="Statut"
+            value={filters.activity}
+            onChange={(e) => setFilter("activity", e.target.value)}
+            disabled={!category || category.activities.length === 0}
+            aria-label="Activité"
           >
-            <option value="">Tous les statuts</option>
-            <option value="A_TRIER">À TRIER</option>
-            <option value="TRIEE">TRIÉE</option>
+            <option value="">Toutes les activités</option>
+            {category?.activities.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
           </select>
-        )}
-        <div className="flex min-w-0 gap-2">
-          <input type="date" className="input min-w-0" value={filters.from} onChange={(e) => setFilter("from", e.target.value)} aria-label="Du" title="Prise de vue à partir du" />
-          <input type="date" className="input min-w-0" value={filters.to} onChange={(e) => setFilter("to", e.target.value)} aria-label="Au" title="Prise de vue jusqu'au" />
+          <select className="input" value={filters.type} onChange={(e) => setFilter("type", e.target.value as Filters["type"])} aria-label="Type">
+            <option value="">Photos et vidéos</option>
+            <option value="photo">Photos</option>
+            <option value="video">Vidéos</option>
+          </select>
+          {isAdmin && (
+            <select
+              className="input"
+              value={filters.status}
+              onChange={(e) => setFilter("status", e.target.value as Filters["status"])}
+              aria-label="Statut"
+            >
+              <option value="">Tous les statuts</option>
+              <option value="A_TRIER">À TRIER</option>
+              <option value="TRIEE">TRIÉE</option>
+            </select>
+          )}
+          <div className="flex min-w-0 gap-2">
+            <input type="date" className="input min-w-0" value={filters.from} onChange={(e) => setFilter("from", e.target.value)} aria-label="Du" title="Prise de vue à partir du" />
+            <input type="date" className="input min-w-0" value={filters.to} onChange={(e) => setFilter("to", e.target.value)} aria-label="Au" title="Prise de vue jusqu'au" />
+          </div>
+          <div className="flex min-w-0 gap-2">
+            <select className="input min-w-0" value={filters.sort} onChange={(e) => setFilter("sort", e.target.value as Filters["sort"])} aria-label="Trier par">
+              <option value="uploaded_at">Date d&apos;import</option>
+              <option value="taken_at">Date de prise de vue</option>
+              <option value="filename">Nom de fichier</option>
+              <option value="size">Taille</option>
+            </select>
+            <select className="input w-32 min-w-0" value={filters.order} onChange={(e) => setFilter("order", e.target.value as Filters["order"])} aria-label="Ordre">
+              <option value="desc">Décroissant</option>
+              <option value="asc">Croissant</option>
+            </select>
+          </div>
+          <button
+            className="btn-secondary"
+            onClick={() => {
+              setQuery("");
+              setFilters({ ...EMPTY });
+              setPage(1);
+            }}
+          >
+            Réinitialiser
+          </button>
         </div>
-        <div className="flex min-w-0 gap-2">
-          <select className="input min-w-0" value={filters.sort} onChange={(e) => setFilter("sort", e.target.value as Filters["sort"])} aria-label="Trier par">
-            <option value="uploaded_at">Date d&apos;import</option>
-            <option value="taken_at">Date de prise de vue</option>
-            <option value="filename">Nom de fichier</option>
-            <option value="size">Taille</option>
-          </select>
-          <select className="input w-32 min-w-0" value={filters.order} onChange={(e) => setFilter("order", e.target.value as Filters["order"])} aria-label="Ordre">
-            <option value="desc">Décroissant</option>
-            <option value="asc">Croissant</option>
-          </select>
-        </div>
-        <button
-          className="btn-secondary"
-          onClick={() => {
-            setQuery("");
-            setFilters({ ...EMPTY });
-            setPage(1);
-          }}
-        >
-          Réinitialiser
-        </button>
       </section>
 
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-neutral-200 bg-white/95 p-3 backdrop-blur">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={allOnPageSelected} onChange={togglePage} className="h-4 w-4 accent-crf" />
-          Tout sélectionner (page)
+        <label className="flex min-h-10 items-center gap-2 text-sm">
+          <input type="checkbox" checked={allOnPageSelected} onChange={togglePage} className="h-5 w-5 accent-crf" />
+          Tout sélectionner<span className="hidden sm:inline"> (page)</span>
         </label>
         <span className="text-sm text-neutral-500">{selected.size} sélectionné(s)</span>
-        {selected.size > 0 && (
-          <>
-            <button className="btn-secondary" onClick={() => setSelected(new Set())}>
-              Désélectionner
-            </button>
-            <button className="btn-primary" onClick={downloadSelection} disabled={busy}>
-              {selected.size > 1 ? `Télécharger (ZIP, ${selected.size})` : "Télécharger"}
-            </button>
-            {isAdmin && (
-              <>
-                <button className="btn-secondary" onClick={() => setStatus(selectedIds, "TRIEE")} disabled={busy}>
-                  Marquer TRIÉE
-                </button>
-                <button className="btn-secondary" onClick={() => setStatus(selectedIds, "A_TRIER")} disabled={busy}>
-                  Remettre À TRIER
-                </button>
-                <button className="btn-danger" onClick={() => setConfirmDelete(selectedIds)} disabled={busy}>
-                  Supprimer ({selected.size})
-                </button>
-              </>
-            )}
-          </>
-        )}
+        {selected.size > 0 && <div className="hidden sm:contents">{selectionActions}</div>}
         {zipProgress && <span className="text-sm text-neutral-600">{zipProgress}</span>}
       </div>
+
+      {selected.size > 0 && (
+        <div className="no-scrollbar fixed inset-x-0 bottom-0 z-20 flex gap-2 overflow-x-auto border-t border-neutral-200 bg-white p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.08)] sm:hidden">
+          {selectionActions}
+        </div>
+      )}
 
       {notice && <p className="rounded-md bg-green-50 p-3 text-sm text-green-800">{notice}</p>}
       {error && (
@@ -323,7 +356,7 @@ export function MediaLibrary({ role, initialStatus }: { role: "user" | "admin"; 
                 aria-label={`Sélectionner ${it.filename}`}
                 checked={selected.has(it.id)}
                 onChange={() => toggle(it.id)}
-                className="absolute left-2 top-2 h-5 w-5 accent-crf"
+                className="absolute left-2 top-2 h-6 w-6 accent-crf sm:h-5 sm:w-5"
               />
               {it.mediaType === "video" && (
                 <span className="absolute right-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">VIDÉO</span>

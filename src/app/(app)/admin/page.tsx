@@ -24,7 +24,7 @@ export default async function AdminDashboard() {
               className={`rounded-xl border bg-white p-4 ${c.accent && stats.toSort > 0 ? "border-amber-300" : "border-neutral-200"}`}
             >
               <p className="text-xs uppercase tracking-wide text-neutral-500">{c.label}</p>
-              <p className="mt-1 text-2xl font-semibold">{c.value}</p>
+              <p className="mt-1 text-xl font-semibold sm:text-2xl">{c.value}</p>
             </div>
           );
           return c.href ? (
@@ -44,7 +44,7 @@ export default async function AdminDashboard() {
           <ul className="space-y-2">
             {stats.byCategory.map((c) => (
               <li key={c.name} className="flex items-center gap-3 text-sm">
-                <span className="w-48 truncate">{c.name}</span>
+                <span className="w-28 truncate sm:w-48">{c.name}</span>
                 <span className="h-2 flex-1 overflow-hidden rounded bg-neutral-100">
                   <span className="block h-full bg-crf" style={{ width: `${(c.count / stats.total) * 100}%` }} />
                 </span>
@@ -54,7 +54,7 @@ export default async function AdminDashboard() {
           </ul>
         )}
       </section>
-      <div className="flex flex-wrap gap-2">
+      <div className="grid gap-2 sm:flex sm:flex-wrap">
         <Link href="/admin/medias?status=A_TRIER" className="btn-primary">
           Trier les nouveaux médias
         </Link>

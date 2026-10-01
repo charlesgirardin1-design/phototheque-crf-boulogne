@@ -323,10 +323,16 @@ export function Uploader() {
         role="button"
         tabIndex={0}
         onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && inputRef.current?.click()}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center transition ${dragOver ? "border-crf bg-crf/5" : "border-neutral-300 bg-white hover:border-neutral-400"}`}
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition sm:p-10 ${dragOver ? "border-crf bg-crf/5" : "border-neutral-300 bg-white hover:border-neutral-400"}`}
       >
-        <p className="font-medium">Glissez-déposez vos fichiers ici</p>
-        <p className="mt-1 text-sm text-neutral-500">ou cliquez pour les sélectionner (sélection multiple possible)</p>
+        <p className="font-medium">
+          <span className="sm:hidden">Touchez pour choisir des photos ou vidéos</span>
+          <span className="hidden sm:inline">Glissez-déposez vos fichiers ici</span>
+        </p>
+        <p className="mt-1 text-sm text-neutral-500">
+          <span className="sm:hidden">Galerie, fichiers ou appareil photo — plusieurs à la fois</span>
+          <span className="hidden sm:inline">ou cliquez pour les sélectionner (sélection multiple possible)</span>
+        </p>
         <p className="mt-3 text-xs text-neutral-400">
           Photos : JPG, PNG, HEIC/HEIF, WEBP, GIF, AVIF, TIFF — Vidéos : MP4, MOV, M4V, WEBM, MKV, AVI, 3GP
         </p>
@@ -351,41 +357,47 @@ export function Uploader() {
       )}
 
       {items.length > 0 && (
-        <section className="rounded-xl border border-neutral-200 bg-white">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 p-4">
+        <section className="flex flex-col rounded-xl border border-neutral-200 bg-white">
+          <div className="sticky bottom-0 z-10 order-last flex flex-wrap items-center justify-between gap-3 rounded-b-xl border-t border-neutral-200 bg-white/95 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur sm:static sm:order-none sm:rounded-none sm:border-b sm:border-t-0 sm:bg-white sm:p-4">
             <p className="text-sm text-neutral-600">
               {items.length} fichier(s) — {doneCount} importé(s)
             </p>
-            <div className="flex gap-2">
+            <div className="flex w-full gap-2 sm:w-auto">
               {!running && (
                 <button
-                  className="btn-secondary"
+                  className="btn-secondary flex-1 sm:flex-none"
                   onClick={() => setItems((prev) => prev.filter((i) => i.state !== "done" && i.state !== "cancelled"))}
                 >
-                  Retirer les terminés
+                  <span className="sm:hidden">Vider</span>
+                  <span className="hidden sm:inline">Retirer les terminés</span>
                 </button>
               )}
               {running && (
-                <button className="btn-secondary" onClick={cancelAll}>
+                <button className="btn-secondary flex-1 sm:flex-none" onClick={cancelAll}>
                   Tout annuler
                 </button>
               )}
-              <button className="btn-primary" disabled={!canStart} onClick={start}>
+              <button className="btn-primary flex-[2] sm:flex-none" disabled={!canStart} onClick={start}>
                 {running ? "Import en cours…" : pending > 0 ? `Importer ${pending} fichier(s)` : "Importer"}
               </button>
             </div>
           </div>
           {(!photographer.trim() || !categoryId) && pending > 0 && (
-            <p className="px-4 pt-3 text-sm text-amber-700">Renseignez le photographe et la catégorie pour lancer l&apos;import.</p>
+            <p className="px-4 pt-3 text-sm text-amber-700 sm:pb-0">Renseignez le photographe et la catégorie pour lancer l&apos;import.</p>
           )}
           <ul className="divide-y divide-neutral-100">
             {items.map((it) => (
-              <li key={it.key} className="flex items-center gap-4 px-4 py-3 text-sm" data-state={it.state}>
-                <span className="w-14 shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-center text-xs uppercase text-neutral-600">
+              <li key={it.key} className="flex items-center gap-3 px-4 py-3 text-sm sm:gap-4" data-state={it.state}>
+                <span className="hidden w-14 shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-center text-xs uppercase text-neutral-600 sm:block">
                   {it.kind === "video" ? "Vidéo" : "Photo"}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{it.file.name}</p>
+                  <p className="truncate font-medium">
+                    <span className="mr-1 sm:hidden" aria-hidden>
+                      {it.kind === "video" ? "🎬" : "📷"}
+                    </span>
+                    {it.file.name}
+                  </p>
                   <p className="text-xs text-neutral-500">
                     {formatBytes(it.file.size)}
                     {it.takenAt !== undefined &&
@@ -405,17 +417,22 @@ export function Uploader() {
                   {it.error && <p className="mt-1 text-xs text-red-700">{it.error}</p>}
                 </div>
                 <span
-                  className={`w-28 shrink-0 text-right text-xs ${it.state === "done" ? "text-green-700" : it.state === "error" ? "text-red-700" : "text-neutral-500"}`}
+                  className={`w-20 shrink-0 text-right text-xs sm:w-28 ${it.state === "done" ? "text-green-700" : it.state === "error" ? "text-red-700" : "text-neutral-500"}`}
                 >
                   {STATE_LABEL[it.state]}
                   {it.state === "uploading" && ` ${Math.round(it.progress * 100)} %`}
                 </span>
                 {["queued", "analyzing", "uploading"].includes(it.state) ? (
-                  <button className="text-xs text-neutral-500 hover:text-red-700" onClick={() => cancel(it.key)}>
-                    Annuler
+                  <button
+                    className="-m-2 p-2 text-xs text-neutral-500 hover:text-red-700"
+                    onClick={() => cancel(it.key)}
+                    aria-label={`Annuler ${it.file.name}`}
+                  >
+                    <span className="sm:hidden">✕</span>
+                    <span className="hidden sm:inline">Annuler</span>
                   </button>
                 ) : (
-                  <span className="w-12" />
+                  <span className="w-4 sm:w-12" />
                 )}
               </li>
             ))}

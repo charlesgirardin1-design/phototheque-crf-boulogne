@@ -8,7 +8,7 @@ avec deux profils d'accès (Utilisateur / Administrateur).
 | Framework | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
 | Hébergement | Vercel (fonctions serverless, région `fra1`) |
 | Base de données | PostgreSQL (Neon recommandé), driver `postgres`, migrations SQL |
-| Stockage des fichiers | Bucket privé compatible S3 (Cloudflare R2 recommandé) |
+| Stockage des fichiers | Vercel Blob privé (en production), ou bucket compatible S3 (R2, AWS…) |
 | Authentification | Mots de passe partagés en variables d'environnement, session signée (cookie HttpOnly) |
 
 ## Fonctionnement
@@ -124,7 +124,12 @@ de données (`scripts/migrate.mjs`, idempotent) puis lance `next build`.
   la connecter au projet : `DATABASE_URL` est ajoutée automatiquement.
 - (Ou créer la base sur neon.tech et copier l'URL *pooled* dans `DATABASE_URL`.)
 
-**Stockage — Cloudflare R2 (10 Go gratuits, pas de frais de sortie)**
+**Stockage — Vercel Blob privé (utilisé en production)**
+- Vercel → projet → *Storage* → *Create* → **Blob**, accès **Private**, puis *Connect* au projet
+  (Production + Preview). `BLOB_STORE_ID` est ajouté automatiquement et l'authentification
+  se fait par OIDC : aucune clé à gérer, aucun réglage CORS.
+
+**Alternative — Cloudflare R2 (si aucun Blob n'est relié)**
 1. Cloudflare → *R2* → *Create bucket* (ex. `phototheque-crf`). Laisser l'accès public **désactivé**.
 2. *R2* → *Manage API tokens* → *Create API token* : permission **Object Read & Write**, limitée à ce
    bucket. Noter l'Access Key ID, le Secret et l'endpoint `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`.

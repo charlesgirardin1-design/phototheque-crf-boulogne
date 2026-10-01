@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "npm run vercel-build",
-  "regions": ["fra1"],
+  "regions": ["iad1"],
   "crons": [{ "path": "/api/cron/cleanup", "schedule": "0 3 * * *" }]
 }

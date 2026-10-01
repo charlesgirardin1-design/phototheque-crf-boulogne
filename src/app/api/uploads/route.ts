@@ -3,7 +3,7 @@ import { db } from "@/lib/server/db";
 import { env } from "@/lib/server/env";
 import { assertSameOrigin, badRequest, cleanText, handler, readJson, requireRole } from "@/lib/server/http";
 import { assertValidClassification } from "@/lib/server/media";
-import { presignUpload } from "@/lib/server/storage";
+import { presignUpload, storageDriver } from "@/lib/server/storage";
 import { formatFor } from "@/lib/media-types";
 
 const MAX_DERIVED_BYTES = 8 * 1024 * 1024;
@@ -72,8 +72,9 @@ export const POST = handler(async (req: Request) => {
   const id = randomUUID();
   const now = new Date();
   const month = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-  const rawExt = filename.slice(filename.lastIndexOf(".") + 1);
-  const storageKey = `originals/${month}/${id}.${rawExt}`;
+  // Le chemin se termine par le nom d'origine : c'est le nom proposé au téléchargement.
+  const keyName = filename.replace(/[#?%]/g, "_");
+  const storageKey = `originals/${month}/${id}/${keyName}`;
   const thumbnailKey = thumbnailSize ? `thumbs/${month}/${id}.jpg` : null;
   const previewKey = previewSize ? `previews/${month}/${id}.jpg` : null;
 
@@ -85,7 +86,20 @@ export const POST = handler(async (req: Request) => {
             ${thumbnailKey}, ${previewKey}, ${takenAt}, ${takenAtSource}, ${photographer},
             ${categoryId}, ${activityId}, 'A_TRIER', 'pending')`;
 
+  if (storageDriver() === "blob") {
+    // Vercel Blob : le navigateur demande ensuite une délégation par fichier à /api/uploads/blob.
+    return Response.json({
+      driver: "blob",
+      id,
+      contentType: format.mime,
+      storageKey,
+      thumbnailKey,
+      previewKey,
+    });
+  }
+
   return Response.json({
+    driver: "s3",
     id,
     contentType: format.mime,
     uploadUrl: await presignUpload(storageKey, format.mime, size as number),

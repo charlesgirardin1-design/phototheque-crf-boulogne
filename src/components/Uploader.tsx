@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api, putFile } from "@/lib/client/api";
+import { sendToBlob } from "@/lib/client/blob-upload";
 import { extractTakenAt, makeDerivatives } from "@/lib/client/media-meta";
 import { ACCEPT_ATTRIBUTE, formatBytes, formatFor } from "@/lib/media-types";
 import { useTaxonomy } from "./useTaxonomy";
@@ -29,6 +30,24 @@ const STATE_LABEL: Record<ItemState, string> = {
   error: "Erreur",
   cancelled: "Annulé",
 };
+
+type PrepareResponse =
+  | {
+      driver: "s3";
+      id: string;
+      contentType: string;
+      uploadUrl: string;
+      thumbnailUrl: string | null;
+      previewUrl: string | null;
+    }
+  | {
+      driver: "blob";
+      id: string;
+      contentType: string;
+      storageKey: string;
+      thumbnailKey: string | null;
+      previewKey: string | null;
+    };
 
 const CONCURRENCY = 3;
 const PHOTOGRAPHER_KEY = "crf-photographer";
@@ -100,13 +119,7 @@ export function Uploader() {
       update(item.key, { takenAt: taken.date, takenAtSource: taken.source });
       if (ctrl.signal.aborted) throw new DOMException("Envoi annulé", "AbortError");
 
-      const prep = await api<{
-        id: string;
-        contentType: string;
-        uploadUrl: string;
-        thumbnailUrl: string | null;
-        previewUrl: string | null;
-      }>("/api/uploads", {
+      const prep = await api<PrepareResponse>("/api/uploads", {
         method: "POST",
         json: {
           filename: item.file.name,
@@ -124,19 +137,28 @@ export function Uploader() {
       uploadId = prep.id;
 
       update(item.key, { state: "uploading" });
-      // L'original est envoyé tel quel (même octets, même nom), directement au stockage.
-      await putFile(
-        prep.uploadUrl,
-        item.file,
-        prep.contentType,
-        (loaded) => update(item.key, { progress: loaded / item.file.size }),
-        ctrl.signal,
-      );
-      if (prep.thumbnailUrl && derived.thumbnail) {
-        await putFile(prep.thumbnailUrl, derived.thumbnail, "image/jpeg", undefined, ctrl.signal).catch(() => {});
-      }
-      if (prep.previewUrl && derived.preview) {
-        await putFile(prep.previewUrl, derived.preview, "image/jpeg", undefined, ctrl.signal).catch(() => {});
+      const onProgress = (loaded: number) => update(item.key, { progress: loaded / item.file.size });
+      // L'original est envoyé tel quel (mêmes octets, même nom), directement au stockage.
+      if (prep.driver === "blob") {
+        await sendToBlob(prep.id, "original", prep.storageKey, item.file, prep.contentType, ctrl.signal, onProgress);
+        if (prep.thumbnailKey && derived.thumbnail) {
+          await sendToBlob(prep.id, "thumbnail", prep.thumbnailKey, derived.thumbnail, "image/jpeg", ctrl.signal).catch(
+            () => {},
+          );
+        }
+        if (prep.previewKey && derived.preview) {
+          await sendToBlob(prep.id, "preview", prep.previewKey, derived.preview, "image/jpeg", ctrl.signal).catch(
+            () => {},
+          );
+        }
+      } else {
+        await putFile(prep.uploadUrl, item.file, prep.contentType, onProgress, ctrl.signal);
+        if (prep.thumbnailUrl && derived.thumbnail) {
+          await putFile(prep.thumbnailUrl, derived.thumbnail, "image/jpeg", undefined, ctrl.signal).catch(() => {});
+        }
+        if (prep.previewUrl && derived.preview) {
+          await putFile(prep.previewUrl, derived.preview, "image/jpeg", undefined, ctrl.signal).catch(() => {});
+        }
       }
 
       update(item.key, { state: "verifying", progress: 1 });

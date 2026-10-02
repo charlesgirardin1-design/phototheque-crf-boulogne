@@ -84,7 +84,7 @@ function videoFrame(file: File): Promise<HTMLCanvasElement | null> {
     };
     video.onseeked = () => {
       clearTimeout(timer);
-      finish(video.videoWidth ? drawScaled(video, video.videoWidth, video.videoHeight, 640) : null);
+      finish(video.videoWidth ? drawScaled(video, video.videoWidth, video.videoHeight, THUMB_PX) : null);
     };
     video.onerror = () => {
       clearTimeout(timer);
@@ -94,28 +94,55 @@ function videoFrame(file: File): Promise<HTMLCanvasElement | null> {
   });
 }
 
+/** Mini-image floue (24 px, quelques centaines d'octets) affichée instantanément. */
+function placeholderOf(source: CanvasImageSource, w: number, h: number): string | null {
+  const canvas = drawScaled(source, w, h, 24);
+  if (!canvas) return null;
+  const url = canvas.toDataURL("image/jpeg", 0.5);
+  return url.startsWith("data:image/jpeg;base64,") && url.length <= 4000 ? url : null;
+}
+
+// Miniature de la grille : 480 px suffisent pour un affichage net sur écran Retina
+// (≈ 30-60 Ko au lieu de 100-200 Ko en 640 px).
+const THUMB_PX = 480;
+const THUMB_QUALITY = 0.78;
+// Aperçu plein écran : 2048 px (≈ 300-600 Ko) au lieu d'un original de plusieurs Mo.
+const PREVIEW_PX = 2048;
+const PREVIEW_QUALITY = 0.82;
+
 /**
- * Génère, POUR L'AFFICHAGE UNIQUEMENT, une miniature JPEG (640 px) et, pour les formats
- * que les navigateurs n'affichent pas (HEIC, TIFF), un aperçu JPEG (1920 px).
- * L'original n'est jamais modifié.
+ * Génère, POUR L'AFFICHAGE UNIQUEMENT :
+ *  - une miniature JPEG (480 px) pour la grille ;
+ *  - un aperçu JPEG (2048 px) pour la vue en grand, dès que l'original est lourd ou n'est
+ *    pas affichable par les navigateurs (HEIC, TIFF) ;
+ *  - une mini-image floue pour un affichage instantané.
+ * L'ORIGINAL n'est jamais modifié : il reste téléchargeable tel quel.
  */
 export async function makeDerivatives(file: File, kind: MediaKind, ext: string) {
+  const none = { thumbnail: null, preview: null, placeholder: null };
   try {
     if (kind === "video") {
       const canvas = await videoFrame(file);
-      return { thumbnail: canvas ? await canvasToJpeg(canvas, 0.8) : null, preview: null };
+      return {
+        thumbnail: canvas ? await canvasToJpeg(canvas, THUMB_QUALITY) : null,
+        preview: null,
+        placeholder: canvas ? placeholderOf(canvas, canvas.width, canvas.height) : null,
+      };
     }
     const bmp = await decodeImage(file, ext);
-    if (!bmp) return { thumbnail: null, preview: null };
-    const thumbCanvas = drawScaled(bmp, bmp.width, bmp.height, 640);
-    const needsPreview = ["heic", "heif", "tif", "tiff"].includes(ext);
-    const previewCanvas = needsPreview ? drawScaled(bmp, bmp.width, bmp.height, 1920) : null;
+    if (!bmp) return none;
+    const thumbCanvas = drawScaled(bmp, bmp.width, bmp.height, THUMB_PX);
+    const notDisplayable = ["heic", "heif", "tif", "tiff"].includes(ext);
+    const heavy = file.size > 1_500_000 || Math.max(bmp.width, bmp.height) > PREVIEW_PX;
+    const previewCanvas = notDisplayable || heavy ? drawScaled(bmp, bmp.width, bmp.height, PREVIEW_PX) : null;
+    const placeholder = placeholderOf(bmp, bmp.width, bmp.height);
     bmp.close();
     return {
-      thumbnail: thumbCanvas ? await canvasToJpeg(thumbCanvas, 0.8) : null,
-      preview: previewCanvas ? await canvasToJpeg(previewCanvas, 0.85) : null,
+      thumbnail: thumbCanvas ? await canvasToJpeg(thumbCanvas, THUMB_QUALITY) : null,
+      preview: previewCanvas ? await canvasToJpeg(previewCanvas, PREVIEW_QUALITY) : null,
+      placeholder,
     };
   } catch {
-    return { thumbnail: null, preview: null };
+    return none;
   }
 }

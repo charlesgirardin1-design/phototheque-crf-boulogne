@@ -15,6 +15,7 @@ export type MediaRow = {
   storage_key: string;
   thumbnail_key: string | null;
   preview_key: string | null;
+  placeholder: string | null;
   uploaded_at: Date;
   taken_at: Date | null;
   taken_at_source: string;
@@ -42,13 +43,15 @@ export type MediaItem = {
   activityName: string | null;
   status: MediaStatus;
   thumbUrl: string | null;
+  /** Mini-image floue (quelques centaines d'octets) affichée instantanément pendant le chargement. */
+  placeholder: string | null;
   viewUrl: string;
   viewIsOriginal: boolean;
 };
 
 const SELECT_MEDIA = (sql: postgres.Sql) => sql`
   SELECT m.id, m.original_filename, m.mime_type, m.media_type, m.size_bytes, m.storage_key,
-         m.thumbnail_key, m.preview_key, m.uploaded_at, m.taken_at, m.taken_at_source,
+         m.thumbnail_key, m.preview_key, m.placeholder, m.uploaded_at, m.taken_at, m.taken_at_source,
          m.photographer, m.category_id, c.name AS category_name, m.activity_id,
          a.name AS activity_name, m.status
   FROM media m
@@ -56,13 +59,15 @@ const SELECT_MEDIA = (sql: postgres.Sql) => sql`
   LEFT JOIN activities a ON a.id = m.activity_id
 `;
 
-/** Convertit une ligne en objet API avec des URL signées (1 h). */
+/** Convertit une ligne en objet API avec des URL signées (stables, mises en cache par le navigateur). */
 export async function toItem(row: MediaRow): Promise<MediaItem> {
-  const thumbUrl = row.thumbnail_key ? await presignGet(row.thumbnail_key) : null;
-  // Aperçu : l'original si le navigateur sait l'afficher, sinon l'aperçu JPEG généré.
+  const thumbUrl = row.thumbnail_key ? await presignGet(row.thumbnail_key, { cacheable: true }) : null;
+  // Affichage en grand : l'aperçu allégé (≈ 2048 px) s'il existe — bien plus rapide que
+  // l'original de plusieurs Mo —, sinon l'original si le navigateur sait l'afficher.
+  // Le TÉLÉCHARGEMENT fournit toujours l'original (route /api/media/[id]/download).
   let viewKey = row.storage_key;
   let viewIsOriginal = true;
-  if (row.media_type === "photo" && !isBrowserDisplayableImage(row.mime_type)) {
+  if (row.media_type === "photo" && (row.preview_key || !isBrowserDisplayableImage(row.mime_type))) {
     const derived = row.preview_key ?? row.thumbnail_key;
     if (derived) {
       viewKey = derived;
@@ -71,8 +76,8 @@ export async function toItem(row: MediaRow): Promise<MediaItem> {
   }
   const viewUrl =
     viewKey === row.storage_key
-      ? await presignGet(row.storage_key, { inlineName: row.original_filename })
-      : await presignGet(viewKey);
+      ? await presignGet(row.storage_key, { inlineName: row.original_filename, cacheable: true })
+      : await presignGet(viewKey, { cacheable: true });
   return {
     id: row.id,
     filename: row.original_filename,
@@ -89,6 +94,7 @@ export async function toItem(row: MediaRow): Promise<MediaItem> {
     activityName: row.activity_name,
     status: row.status,
     thumbUrl,
+    placeholder: row.placeholder,
     viewUrl,
     viewIsOriginal,
   };

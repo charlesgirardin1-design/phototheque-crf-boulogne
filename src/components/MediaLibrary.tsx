@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/client/api";
 import { downloadAsZip } from "@/lib/client/zip";
 import type { MediaItem } from "@/lib/server/media";
@@ -34,6 +34,51 @@ const EMPTY: Filters = {
 };
 
 type ListResponse = { items: MediaItem[]; total: number; page: number; pageSize: number };
+
+/** Précharge des images dans le cache du navigateur (URL stables : réutilisées ensuite). */
+function warmImages(urls: (string | null | undefined)[]) {
+  for (const url of urls) {
+    if (!url) continue;
+    const img = new Image();
+    img.decoding = "async";
+    img.src = url;
+  }
+}
+
+/**
+ * Vignette : la mini-image floue s'affiche immédiatement, puis la miniature apparaît en
+ * fondu dès qu'elle est chargée. Les premières vignettes sont chargées en priorité.
+ */
+function Thumb({ item, index }: { item: MediaItem; index: number }) {
+  const [loaded, setLoaded] = useState(false);
+  const onRef = useCallback((img: HTMLImageElement | null) => {
+    if (img?.complete && img.naturalWidth > 0) setLoaded(true);
+  }, []);
+  return (
+    <>
+      {item.placeholder && !loaded && (
+        <span
+          aria-hidden
+          className="absolute inset-0 scale-110 bg-cover bg-center blur-md"
+          style={{ backgroundImage: `url(${item.placeholder})` }}
+        />
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element -- URL signée externe */}
+      <img
+        ref={onRef}
+        src={item.thumbUrl!}
+        alt={item.filename}
+        width={480}
+        height={480}
+        loading={index < 12 ? "eager" : "lazy"}
+        fetchPriority={index < 6 ? "high" : "auto"}
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        className={`relative h-full w-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+      />
+    </>
+  );
+}
 
 export function MediaLibrary({ role, initialStatus }: { role: "user" | "admin"; initialStatus?: MediaStatus }) {
   const isAdmin = role === "admin";
@@ -69,13 +114,23 @@ export function MediaLibrary({ role, initialStatus }: { role: "user" | "admin"; 
     return sp.toString();
   }, [filters, page]);
 
+  // Pages déjà chargées ou préchargées (vidé par reload() à chaque modification des médias).
+  const pageCache = useRef(new Map<string, ListResponse>());
+
   useEffect(() => {
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- indicateur de chargement
+    const cached = pageCache.current.get(queryString);
+    if (cached) {
+      // Page préchargée : affichage instantané.
+      setData(cached);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     api<ListResponse>(`/api/media?${queryString}`)
       .then((res) => {
         if (cancelled) return;
+        pageCache.current.set(queryString, res);
         setData(res);
         setError(null);
       })
@@ -86,7 +141,30 @@ export function MediaLibrary({ role, initialStatus }: { role: "user" | "admin"; 
     };
   }, [queryString, reloadKey]);
 
-  const reload = useCallback(() => setReloadKey((k) => k + 1), []);
+  // Préchargement de la page suivante (données + miniatures) pendant que l'on regarde celle-ci.
+  useEffect(() => {
+    if (!data || loading) return;
+    const pages = Math.ceil(data.total / data.pageSize);
+    if (data.page >= pages) return;
+    const sp = new URLSearchParams(queryString);
+    sp.set("page", String(data.page + 1));
+    const nextKey = sp.toString();
+    if (pageCache.current.has(nextKey)) return;
+    const timer = setTimeout(() => {
+      api<ListResponse>(`/api/media?${nextKey}`)
+        .then((res) => {
+          pageCache.current.set(nextKey, res);
+          warmImages(res.items.map((i) => i.thumbUrl));
+        })
+        .catch(() => {});
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [data, loading, queryString]);
+
+  const reload = useCallback(() => {
+    pageCache.current.clear();
+    setReloadKey((k) => k + 1);
+  }, []);
   const setFilter = <K extends keyof Filters>(k: K, v: Filters[K]) => {
     setFilters((f) => ({ ...f, [k]: v, ...(k === "category" ? { activity: "" } : {}) }));
     setPage(1);
@@ -168,6 +246,14 @@ export function MediaLibrary({ role, initialStatus }: { role: "user" | "admin"; 
     });
 
   const viewed = viewIndex !== null ? (items[viewIndex] ?? null) : null;
+
+  // Vue en grand : précharge les photos voisines pour une navigation ← → instantanée.
+  useEffect(() => {
+    const list = data?.items;
+    if (viewIndex === null || !list) return;
+    const neighbours = [list[viewIndex - 1], list[viewIndex + 1], list[viewIndex + 2]];
+    warmImages(neighbours.filter((i) => i && i.mediaType === "photo").map((i) => i!.viewUrl));
+  }, [viewIndex, data]);
 
   const selectionActions = (
     <>
@@ -341,10 +427,13 @@ export function MediaLibrary({ role, initialStatus }: { role: "user" | "admin"; 
               data-testid="media-card"
               className={`group relative overflow-hidden rounded-lg border bg-white ${selected.has(it.id) ? "border-crf ring-2 ring-crf" : "border-neutral-200"}`}
             >
-              <button className="block aspect-square w-full bg-neutral-100" onClick={() => setViewIndex(idx)} title={it.filename}>
+              <button
+                className="relative block aspect-square w-full overflow-hidden bg-neutral-100"
+                onClick={() => setViewIndex(idx)}
+                title={it.filename}
+              >
                 {it.thumbUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- URL signée externe
-                  <img src={it.thumbUrl} alt={it.filename} loading="lazy" className="h-full w-full object-cover" />
+                  <Thumb item={it} index={idx} />
                 ) : (
                   <span className="flex h-full w-full items-center justify-center text-3xl text-neutral-400">
                     {it.mediaType === "video" ? "▶" : "🖼"}

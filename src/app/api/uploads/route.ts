@@ -20,7 +20,14 @@ type Body = {
   takenAtSource?: unknown;
   thumbnailSize?: unknown;
   previewSize?: unknown;
+  placeholder?: unknown;
 };
+
+/** Mini-image floue générée par le navigateur (data URL JPEG, quelques centaines d'octets). */
+function cleanPlaceholder(v: unknown) {
+  if (typeof v !== "string" || v.length > 4000) return null;
+  return /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(v) ? v : null;
+}
 
 function derivedSize(v: unknown) {
   if (v === undefined || v === null || v === 0) return null;
@@ -93,11 +100,11 @@ export const POST = handler(async (req: Request) => {
 
   await db()`
     INSERT INTO media (id, original_filename, mime_type, media_type, size_bytes, derived_bytes, storage_key,
-                       thumbnail_key, preview_key, taken_at, taken_at_source, photographer,
+                       thumbnail_key, preview_key, placeholder, taken_at, taken_at_source, photographer,
                        category_id, activity_id, status, upload_state)
     VALUES (${id}, ${filename}, ${format.mime}, ${format.kind}, ${size as number}, ${derivedBytes}, ${storageKey},
-            ${thumbnailKey}, ${previewKey}, ${takenAt}, ${takenAtSource}, ${photographer},
-            ${categoryId}, ${activityId}, 'A_TRIER', 'pending')`;
+            ${thumbnailKey}, ${previewKey}, ${cleanPlaceholder(body.placeholder)}, ${takenAt}, ${takenAtSource},
+            ${photographer}, ${categoryId}, ${activityId}, 'A_TRIER', 'pending')`;
 
   if (storageDriver() === "blob") {
     // Vercel Blob : le navigateur demande ensuite une délégation par fichier à /api/uploads/blob.

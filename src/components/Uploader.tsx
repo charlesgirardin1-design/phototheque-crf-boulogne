@@ -135,6 +135,7 @@ export function Uploader() {
           takenAtSource: taken.source,
           thumbnailSize: derived.thumbnail?.size ?? 0,
           previewSize: derived.preview?.size ?? 0,
+          placeholder: derived.placeholder,
         },
         signal: ctrl.signal,
       });

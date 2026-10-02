@@ -50,10 +50,16 @@ export const env = {
     const safeMb = Number.isFinite(mb) && mb > 0 ? Math.min(mb, 5120) : 5000;
     return Math.floor(safeMb * 1024 * 1024);
   },
-  /** Espace de stockage total (défaut : 1 Go, offre Vercel Hobby). STORAGE_QUOTA_GB pour une autre offre. */
+  /**
+   * Espace de stockage total. Défaut : 1 Go avec Vercel Blob (offre Hobby), 10 Go avec un
+   * stockage S3 (offre gratuite Backblaze B2). STORAGE_QUOTA_GB pour une autre valeur.
+   */
   get storageQuotaBytes() {
-    const gb = Number(optional("STORAGE_QUOTA_GB") ?? "1");
-    return Math.round((Number.isFinite(gb) && gb > 0 ? gb : 1) * 1_000_000_000);
+    const s3 = ["S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"].every((k) => optional(k));
+    const useS3 = process.env.STORAGE_DRIVER === "s3" || (process.env.STORAGE_DRIVER !== "blob" && s3);
+    const fallback = useS3 ? 10 : 1;
+    const gb = Number(optional("STORAGE_QUOTA_GB") ?? String(fallback));
+    return Math.round((Number.isFinite(gb) && gb > 0 ? gb : fallback) * 1_000_000_000);
   },
   get cronSecret() {
     return optional("CRON_SECRET");

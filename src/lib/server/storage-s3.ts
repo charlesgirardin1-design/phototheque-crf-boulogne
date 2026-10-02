@@ -3,6 +3,7 @@ import {
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectVersionsCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -59,10 +60,19 @@ function contentDisposition(kind: "inline" | "attachment", filename: string) {
   return `${kind}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
-/** URL de lecture temporaire. `downloadName` force le téléchargement sous le nom d'origine. */
+// Les URL d'affichage sont signées sur une fenêtre de 6 h et valables 12 h : pendant 6 h,
+// une même image a donc toujours la même URL, que le navigateur peut garder en cache.
+const CACHE_WINDOW_MS = 6 * 60 * 60 * 1000;
+const CACHE_EXPIRES_S = 12 * 60 * 60;
+
+/**
+ * URL de lecture temporaire. `downloadName` force le téléchargement sous le nom d'origine.
+ * `cacheable` : URL stable + en-tête de cache long (les clés de stockage ne changent jamais
+ * de contenu), pour que miniatures et aperçus ne soient téléchargés qu'une fois.
+ */
 export async function presignGet(
   key: string,
-  opts: { downloadName?: string; inlineName?: string; expiresIn?: number } = {},
+  opts: { downloadName?: string; inlineName?: string; expiresIn?: number; cacheable?: boolean } = {},
 ) {
   const cmd = new GetObjectCommand({
     Bucket: bucket(),
@@ -72,7 +82,12 @@ export async function presignGet(
       : opts.inlineName
         ? contentDisposition("inline", opts.inlineName)
         : undefined,
+    ResponseCacheControl: opts.cacheable ? "private, max-age=43200, immutable" : undefined,
   });
+  if (opts.cacheable) {
+    const signingDate = new Date(Math.floor(Date.now() / CACHE_WINDOW_MS) * CACHE_WINDOW_MS);
+    return getSignedUrl(client(), cmd, { expiresIn: CACHE_EXPIRES_S, signingDate });
+  }
   return getSignedUrl(client(), cmd, { expiresIn: opts.expiresIn ?? 60 * 60 });
 }
 
@@ -96,18 +111,52 @@ export async function readHead(key: string, bytes = 64): Promise<Uint8Array> {
   return res.Body ? await res.Body.transformToByteArray() : new Uint8Array();
 }
 
-/** Supprime définitivement des objets. Lève une erreur si un objet n'a pas pu être supprimé. */
+type ObjectRef = { Key: string; VersionId?: string };
+
+/**
+ * Toutes les versions d'un objet. Backblaze B2 (et tout bucket versionné) conserve les
+ * versions précédentes : une suppression simple ne fait que CACHER le fichier, qui reste
+ * stocké (et facturé). Pour une suppression réellement définitive, chaque version est supprimée.
+ */
+async function versionsOf(key: string): Promise<ObjectRef[] | null> {
+  try {
+    const refs: ObjectRef[] = [];
+    let KeyMarker: string | undefined;
+    let VersionIdMarker: string | undefined;
+    do {
+      const res = await client().send(
+        new ListObjectVersionsCommand({ Bucket: bucket(), Prefix: key, KeyMarker, VersionIdMarker }),
+      );
+      for (const v of [...(res.Versions ?? []), ...(res.DeleteMarkers ?? [])]) {
+        if (v.Key === key) refs.push({ Key: key, VersionId: v.VersionId ?? undefined });
+      }
+      KeyMarker = res.IsTruncated ? res.NextKeyMarker : undefined;
+      VersionIdMarker = res.IsTruncated ? res.NextVersionIdMarker : undefined;
+    } while (KeyMarker);
+    return refs;
+  } catch {
+    return null; // fournisseur sans versions : suppression simple
+  }
+}
+
+/** Supprime définitivement des objets (toutes versions). Lève une erreur si un objet n'a pas pu être supprimé. */
 export async function deleteObjects(keys: string[]) {
   const unique = [...new Set(keys.filter(Boolean))];
-  for (let i = 0; i < unique.length; i += 1000) {
-    const chunk = unique.slice(i, i + 1000);
+  const refs: ObjectRef[] = [];
+  for (let i = 0; i < unique.length; i += 8) {
+    const lists = await Promise.all(unique.slice(i, i + 8).map(versionsOf));
+    lists.forEach((list, j) => {
+      const key = unique[i + j];
+      if (list === null) refs.push({ Key: key });
+      else refs.push(...list); // liste vide : objet déjà absent
+    });
+  }
+  for (let i = 0; i < refs.length; i += 1000) {
+    const chunk = refs.slice(i, i + 1000);
     const res = await client().send(
-      new DeleteObjectsCommand({
-        Bucket: bucket(),
-        Delete: { Objects: chunk.map((Key) => ({ Key })), Quiet: true },
-      }),
+      new DeleteObjectsCommand({ Bucket: bucket(), Delete: { Objects: chunk, Quiet: true } }),
     );
-    const errors = (res.Errors ?? []).filter((e) => e.Code !== "NoSuchKey");
+    const errors = (res.Errors ?? []).filter((e) => e.Code !== "NoSuchKey" && e.Code !== "NoSuchVersion");
     if (errors.length > 0) {
       throw new Error(`Suppression impossible de ${errors.length} fichier(s) dans le stockage`);
     }

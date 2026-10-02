@@ -28,7 +28,7 @@ export function storageDriver(): StorageDriver {
 
 export async function presignGet(
   key: string,
-  opts: { downloadName?: string; inlineName?: string; expiresIn?: number } = {},
+  opts: { downloadName?: string; inlineName?: string; expiresIn?: number; cacheable?: boolean } = {},
 ) {
   if (storageDriver() === "blob") {
     // Le nom de téléchargement est celui du chemin, qui se termine par le nom d'origine.

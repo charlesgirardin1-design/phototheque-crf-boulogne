@@ -116,8 +116,13 @@ test("connexions utilisateur et administrateur", async () => {
   assert.deepEqual(await body(a), { role: "admin" });
   taxonomy = (await body(await call(admin, "/api/taxonomy"))).categories as typeof taxonomy;
   const names = taxonomy.map((t) => t.name);
-  for (const n of ["US", "AS", "Activité de transfert", "Autre"]) assert.ok(names.includes(n), n);
-  assert.ok(taxonomy.find((t) => t.name === "Autre")!.activities.some((a) => a.name === "Formation"));
+  assert.deepEqual(names.slice(0, 5), ["Formation", "US", "AS", "Activité de transverse", "Autre"]);
+  const acts = (n: string) => taxonomy.find((t) => t.name === n)!.activities.map((a) => a.name);
+  assert.deepEqual(acts("Formation"), ["JMPS", "PSC/EPSC", "Autre"]);
+  assert.deepEqual(acts("US"), ["Urgence", "Poste de secours", "DPS", "Autre"]);
+  assert.equal(acts("AS").length, 12);
+  assert.deepEqual(acts("Activité de transverse"), ["Forum des activités", "JN", "Muguet", "Banque alimentaire", "Autre"]);
+  assert.deepEqual(acts("Autre"), ["Autre"]);
 });
 
 test("un utilisateur ne peut rien faire d'administrateur", async () => {
@@ -158,7 +163,7 @@ test("import, statut, visibilité, téléchargement de l'original intact, suppre
   assert.equal(item.mimeType, "image/jpeg");
   assert.equal(item.photographer, "Marie Dupont");
   assert.equal(item.categoryName, "Autre");
-  assert.equal(item.activityName, "Formation");
+  assert.equal(item.activityName, "Autre");
   assert.equal(item.takenAt, "2024-06-15T10:00:00.000Z");
 
   // L'utilisateur ne fait qu'importer : aucune consultation ni téléchargement.

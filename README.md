@@ -31,8 +31,8 @@ avec deux profils d'accès (Utilisateur / Administrateur).
 - **Statut** : tout nouvel import est « À TRIER ». L'administrateur le passe à « TRIÉE » (ou l'inverse),
   individuellement ou en lot.
 - **Catégories et activités** en base de données, gérées par l'administrateur (ajout, renommage,
-  désactivation, suppression si inutilisées). Données initiales : US, AS, Activité de transfert,
-  Autre (avec l'activité Formation).
+  désactivation, suppression si inutilisées). Données initiales : Formation, US, AS, Activité de
+  transverse et Autre, avec leurs activités (voir `db/migrations/003_taxonomy.sql`).
 - **Administration** : tableau de bord, recherche, filtres (catégorie, activité, type, statut, dates),
   tri, aperçu photo/vidéo, sélection multiple, changement de statut, correction des informations,
   téléchargement, suppression définitive avec confirmation.
